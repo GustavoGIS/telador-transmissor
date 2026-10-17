@@ -10,7 +10,7 @@
     "postinstall": "node scripts/vendor-livekit.js && node scripts/make-icon.js",
     "start": "electron .",
     "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-native.ps1",
-    "build": "npm run icon && npm run vendor:livekit && npm run build:native && electron-builder",
+    "build": "npm run icon && npm run vendor:livekit && npm run build:native && electron-builder --publish never",
     "release:local": "npm run build"
   },
   "build": {
