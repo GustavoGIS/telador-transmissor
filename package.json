@@ -1,6 +1,6 @@
 {
   "name": "telador-transmissor",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Transmissor de tela do Telador",
   "author": "Gustavo",
   "main": "main.js",
@@ -29,6 +29,10 @@
     ],
     "asarUnpack": [
       "native/**/*.exe"
+    ],
+    "extraResources": [
+      { "from": "icon.ico", "to": "icon.ico" },
+      { "from": "icon.png", "to": "icon.png" }
     ],
     "win": {
       "target": "portable",

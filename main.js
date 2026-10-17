@@ -17,30 +17,74 @@ const APP_VERSION = (() => {
 })();
 const HOOKS_VERSION = APP_VERSION;
 const USE_LOCAL_WORKER = true;
+// AUMID empacotado ≠ dev: se npm start usar o mesmo ID, o Windows cacheia o ícone do electron.exe na taskbar
+const APP_USER_MODEL_ID = "com.telador.transmissor.win";
 const cfgPath = () => path.join(app.getPath("userData"), "config.json");
 const HOOKS_PATH = path.join(__dirname, "captureHooks.js");
 const WORKER_HTML = path.join(__dirname, "worker", "index.html");
 const ICON_PNG = path.join(__dirname, "icon.png");
 const ICON_ICO = path.join(__dirname, "icon.ico");
 
-function appIconPath() {
-  // Windows taskbar prefer .ico; cai para PNG se ainda não gerado
+if (process.platform === "win32") {
   try {
-    if (process.platform === "win32" && fs.existsSync(ICON_ICO)) return ICON_ICO;
+    app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : APP_USER_MODEL_ID + ".dev");
   } catch {}
+}
+
+function appIconPath() {
+  const candidates = [];
+  try {
+    if (process.resourcesPath) {
+      candidates.push(path.join(process.resourcesPath, "icon.ico"));
+      candidates.push(path.join(process.resourcesPath, "icon.png"));
+    }
+  } catch {}
+  candidates.push(ICON_ICO, ICON_PNG);
+  for (const p of candidates) {
+    try {
+      if (p && fs.existsSync(p)) return p;
+    } catch {}
+  }
   return ICON_PNG;
 }
 
 function loadAppIcon() {
-  try {
-    const img = nativeImage.createFromPath(appIconPath());
-    if (img && !img.isEmpty()) return img;
-  } catch {}
-  try {
-    const img = nativeImage.createFromPath(ICON_PNG);
-    if (img && !img.isEmpty()) return img;
-  } catch {}
+  for (const p of [appIconPath(), ICON_ICO, ICON_PNG]) {
+    try {
+      const img = nativeImage.createFromPath(p);
+      if (img && !img.isEmpty()) return img;
+    } catch {}
+  }
   return nativeImage.createEmpty();
+}
+
+function applyWindowIcon(win) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    const img = loadAppIcon();
+    if (img && !img.isEmpty()) win.setIcon(img);
+  } catch {}
+}
+
+function scrubElectronStartMenuPoison() {
+  if (process.platform !== "win32" || !app.isPackaged) return;
+  try {
+    const lnk = path.join(
+      app.getPath("appData"),
+      "Microsoft",
+      "Windows",
+      "Start Menu",
+      "Programs",
+      "Electron.lnk"
+    );
+    if (!fs.existsSync(lnk)) return;
+    const info = shell.readShortcutLink(lnk);
+    const target = String((info && info.target) || "");
+    if (/node_modules[\\/]electron[\\/]dist[\\/]electron\.exe$/i.test(target)) {
+      fs.unlinkSync(lnk);
+      log.info("removed poisonous Electron.lnk");
+    }
+  } catch {}
 }
 
 const readCfg = () => {
@@ -559,6 +603,7 @@ function startWorker() {
           backgroundThrottling: false,
         },
       });
+      applyWindowIcon(worker);
       worker.webContents.setAudioMuted(true);
       worker.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       worker.webContents.on("did-finish-load", () => {
@@ -660,6 +705,7 @@ function openPanel() {
     opts.y = bounds.y;
   }
   setup = new BrowserWindow(opts);
+  applyWindowIcon(setup);
   setup.on("close", (e) => {
     if (isQuitting) return;
     e.preventDefault();
@@ -670,6 +716,7 @@ function openPanel() {
   setup.on("resize", persistBoundsSoon);
   setup.on("move", persistBoundsSoon);
   setup.once("ready-to-show", () => {
+    applyWindowIcon(setup);
     try {
       if (bounds && bounds.isMaximized) setup.maximize();
       else if (!bounds) setup.maximize();
@@ -1172,8 +1219,9 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
-    try { app.setAppUserModelId("com.telador.transmissor"); } catch {}
-    log.info("app ready", { version: APP_VERSION });
+    scrubElectronStartMenuPoison();
+    baseIcon = loadAppIcon();
+    log.info("app ready", { version: APP_VERSION, packaged: app.isPackaged });
     const allowPerm = new Set(["media", "display-capture", "mediaKeySystem", "fullscreen"]);
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => allowPerm.has(String(perm)));
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => {
