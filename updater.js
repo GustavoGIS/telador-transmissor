@@ -102,35 +102,117 @@ function normalizeDigest(d) {
   return m ? m[1] : "";
 }
 
-/** Caminho do .exe que o usuário abre (atalho/Downloads), não o unpack em %TEMP%. */
-function resolveInstallPath() {
+function cmdQuote(p) {
+  return `"${String(p).replace(/"/g, "")}"`;
+}
+
+function updatesDir() {
+  return path.join(app.getPath("userData"), "updates");
+}
+
+/** Caminho real do portable que o usuário abriu (ex.: Área de trabalho\...\0.2.5.exe). */
+function getPortableLaunchPath() {
   try {
     const portable = process.env.PORTABLE_EXECUTABLE_FILE;
     if (portable && typeof portable === "string" && fs.existsSync(portable)) {
       return path.resolve(portable);
     }
   } catch {}
+  return null;
+}
+
+/**
+ * Onde substituir: SEMPRE o portable lançado.
+ * Fallback: exe empacotado fora de %TEMP% (não portable).
+ */
+function resolveReplacePath() {
+  const portable = getPortableLaunchPath();
+  if (portable) return portable;
   try {
     if (app.isPackaged && process.execPath) {
       const exec = path.resolve(process.execPath);
       const temp = path.resolve(app.getPath("temp"));
-      // Portable do electron-builder roda de pasta temp — não sobrescrever isso
-      if (exec.toLowerCase().startsWith(temp.toLowerCase() + path.sep)) {
-        return null;
+      if (!exec.toLowerCase().startsWith(temp.toLowerCase() + path.sep)) {
+        return exec;
       }
-      return exec;
     }
   } catch {}
   return null;
 }
 
-function cmdQuote(p) {
-  return `"${String(p).replace(/"/g, "")}"`;
+function safeUnlink(p) {
+  try {
+    if (p && fs.existsSync(p)) fs.unlinkSync(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Troca o .exe original pelo baixado e relança.
- * Antes só abria a cópia em userData/updates — o atalho do 0.2.5 continuava antigo.
+ * Apaga downloads antigos em userData/updates e outros
+ * Telador-Transmissor-*.exe na mesma pasta do portable (exceto o ativo).
+ */
+function cleanupOldArtifacts(keepPaths) {
+  const keep = new Set(
+    (keepPaths || []).filter(Boolean).map((p) => path.resolve(p).toLowerCase())
+  );
+  const removed = [];
+
+  const sweepDir = (dir, { onlyAssets = true } = {}) => {
+    if (!dir || !fs.existsSync(dir)) return;
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (onlyAssets && !ASSET_RE.test(name)) continue;
+      const full = path.resolve(dir, name);
+      if (keep.has(full.toLowerCase())) continue;
+      try {
+        const st = fs.statSync(full);
+        if (!st.isFile()) continue;
+        fs.unlinkSync(full);
+        removed.push(full);
+      } catch (e) {
+        log.warn("cleanup skip", { full, err: e && e.message });
+      }
+    }
+  };
+
+  try {
+    sweepDir(updatesDir());
+  } catch {}
+
+  try {
+    const replacePath = resolveReplacePath();
+    if (replacePath) sweepDir(path.dirname(replacePath));
+  } catch {}
+
+  // Pasta canônica antiga (versões intermediárias do updater) — limpar se existir
+  try {
+    const legacyDir = path.join(
+      process.env.LOCALAPPDATA || app.getPath("appData"),
+      "TeladorTransmissor"
+    );
+    if (fs.existsSync(legacyDir)) {
+      sweepDir(legacyDir);
+      try {
+        const left = fs.readdirSync(legacyDir);
+        if (!left.length) fs.rmdirSync(legacyDir);
+      } catch {}
+    }
+  } catch {}
+
+  if (removed.length) log.info("cleanup old artifacts", { count: removed.length, removed });
+  return removed;
+}
+
+/**
+ * Substitui o .exe portable no caminho em que está, verifica o arquivo,
+ * limpa restos e relança o mesmo caminho.
  */
 function applyDownloaded(exePath) {
   const downloaded = path.resolve(exePath);
@@ -138,32 +220,39 @@ function applyDownloaded(exePath) {
     throw new Error("Arquivo de update não encontrado");
   }
 
-  const installPath = resolveInstallPath();
+  const replacePath = resolveReplacePath();
   log.info("applying update", {
     downloaded,
-    installPath: installPath || "(none)",
+    replacePath: replacePath || "(none)",
     portableFile: process.env.PORTABLE_EXECUTABLE_FILE || "",
     portableDir: process.env.PORTABLE_EXECUTABLE_DIR || "",
   });
 
-  // Dev ou sem caminho estável: só abre o baixado
-  if (!installPath || path.resolve(installPath) === downloaded) {
+  if (!replacePath) {
+    // Sem caminho estável: abre o baixado (dev / caso raro)
+    cleanupOldArtifacts([downloaded]);
     spawn(downloaded, [], { detached: true, stdio: "ignore" }).unref();
     setTimeout(() => {
-      try { app.quit(); } catch {}
+      try { app.exit(0); } catch {}
     }, 400);
     return true;
   }
 
-  // Sobrescreve o mesmo caminho do atalho (ex.: ...\Telador-Transmissor-0.2.5.exe)
-  // para o atalho continuar válido; a versão real vem de dentro do app.
-  const finalPath = installPath;
   const pid = process.pid;
-  const scriptPath = path.join(app.getPath("temp"), `telador-update-${pid}-${Date.now()}.cmd`);
+  const tmp = app.getPath("temp");
+  const scriptPath = path.join(tmp, `telador-update-${pid}-${Date.now()}.cmd`);
+  const verifyPath = path.join(tmp, `telador-update-verify-${pid}.txt`);
+  const expectedSize = (() => {
+    try { return fs.statSync(downloaded).size; } catch { return 0; }
+  })();
 
+  // Após sair: mata bandeja antiga → copia por cima do portable → confere tamanho →
+  // apaga updates antigos e outros Telador-Transmissor-*.exe na pasta (exceto o ativo)
+  const replaceDir = path.dirname(replacePath);
+  const keepName = path.basename(replacePath);
   const lines = [
     "@echo off",
-    "setlocal",
+    "setlocal EnableExtensions",
     ":wait",
     `tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul`,
     "if not errorlevel 1 (",
@@ -171,15 +260,45 @@ function applyDownloaded(exePath) {
     "  goto wait",
     ")",
     "timeout /t 1 /nobreak >nul",
-    `copy /Y ${cmdQuote(downloaded)} ${cmdQuote(finalPath)}`,
+    'taskkill /IM "Telador Transmissor.exe" /F >nul 2>&1',
+    'taskkill /IM "Telador-Transmissor.exe" /F >nul 2>&1',
+    "timeout /t 1 /nobreak >nul",
+    `copy /Y ${cmdQuote(downloaded)} ${cmdQuote(replacePath)}`,
     "if errorlevel 1 (",
+    `  echo COPY_FAIL>${cmdQuote(verifyPath)}`,
     `  start "" ${cmdQuote(downloaded)}`,
     "  goto cleanup",
     ")",
-    `start "" ${cmdQuote(finalPath)}`,
+  ];
+
+  if (expectedSize > 0) {
+    // Verifica se o arquivo final tem o mesmo tamanho do download
+    lines.push(
+      `for %%A in (${cmdQuote(replacePath)}) do set SZ=%%~zA`,
+      `if not "%SZ%"=="${expectedSize}" (`,
+      `  echo SIZE_FAIL %SZ%>>${cmdQuote(verifyPath)}`,
+      `  start "" ${cmdQuote(downloaded)}`,
+      "  goto cleanup",
+      ")",
+    );
+  }
+
+  lines.push(
+    `echo OK>${cmdQuote(verifyPath)}`,
+    // Staging userData\\updates
+    `if exist ${cmdQuote(updatesDir())} for %%F in (${cmdQuote(path.join(updatesDir(), "Telador-Transmissor-*.exe"))}) do del /F /Q "%%~fF" 2>nul`,
+    // Pasta do portable: outros Telador-Transmissor-*.exe (mantém o que acabou de substituir)
+    `for %%F in (${cmdQuote(path.join(replaceDir, "Telador-Transmissor-*.exe"))}) do (`,
+    `  if /I not "%%~nxF"=="${keepName}" del /F /Q "%%~fF" 2>nul`,
+    ")",
+    // Pasta legada de builds intermediárias
+    `if exist ${cmdQuote(path.join(process.env.LOCALAPPDATA || "", "TeladorTransmissor"))} (`,
+    `  for %%F in (${cmdQuote(path.join(process.env.LOCALAPPDATA || "", "TeladorTransmissor", "Telador-Transmissor*.exe"))}) do del /F /Q "%%~fF" 2>nul`,
+    ")",
+    `start "" ${cmdQuote(replacePath)}`,
     ":cleanup",
     'del /F /Q "%~f0" 2>nul',
-  ];
+  );
 
   fs.writeFileSync(scriptPath, lines.join("\r\n"), "utf8");
   spawn("cmd.exe", ["/c", scriptPath], {
@@ -189,9 +308,49 @@ function applyDownloaded(exePath) {
   }).unref();
 
   setTimeout(() => {
-    try { app.quit(); } catch {}
+    try { app.exit(0); } catch {}
   }, 400);
   return true;
+}
+
+/** Limpeza leve na abertura (não apaga o portable ativo). */
+function cleanupOnStartup() {
+  try {
+    const keep = [getPortableLaunchPath(), resolveReplacePath()].filter(Boolean);
+    // Só limpa userData/updates e pasta legada — NÃO varre a Área de trabalho
+    // (pode haver cópias intencionais). Desktop só limpa no apply pós-update.
+    const removed = [];
+    const dir = updatesDir();
+    if (fs.existsSync(dir)) {
+      for (const name of fs.readdirSync(dir)) {
+        if (!ASSET_RE.test(name)) continue;
+        const full = path.join(dir, name);
+        if (keep.some((k) => path.resolve(k).toLowerCase() === path.resolve(full).toLowerCase())) {
+          continue;
+        }
+        if (safeUnlink(full)) removed.push(full);
+      }
+    }
+    const legacyDir = path.join(
+      process.env.LOCALAPPDATA || app.getPath("appData"),
+      "TeladorTransmissor"
+    );
+    if (fs.existsSync(legacyDir)) {
+      for (const name of fs.readdirSync(legacyDir)) {
+        if (!ASSET_RE.test(name) && name !== "Telador-Transmissor.exe") continue;
+        const full = path.join(legacyDir, name);
+        if (safeUnlink(full)) removed.push(full);
+      }
+      try {
+        if (!fs.readdirSync(legacyDir).length) fs.rmdirSync(legacyDir);
+      } catch {}
+    }
+    if (removed.length) log.info("startup cleanup", { count: removed.length });
+    return removed;
+  } catch (e) {
+    log.warn("startup cleanup", e && e.message);
+    return [];
+  }
 }
 
 async function checkForUpdates() {
@@ -219,7 +378,11 @@ async function checkForUpdates() {
       notes: String(data.body || "").slice(0, 2000),
       htmlUrl: String(data.html_url || `https://github.com/${REPO}/releases/tag/${tag}`),
     };
-    log.info("update available", { version, digest: latestInfo.digest ? "yes" : "no" });
+    log.info("update available", {
+      version,
+      digest: latestInfo.digest ? "yes" : "no",
+      replacePath: resolveReplacePath() || "(unknown)",
+    });
     return latestInfo;
   } catch (e) {
     log.warn("update check error", e && e.message);
@@ -237,12 +400,13 @@ async function downloadLatest(onProgress) {
   if (downloading) throw new Error("Download já em andamento");
   downloading = true;
   try {
-    const dir = path.join(app.getPath("userData"), "updates");
+    const dir = updatesDir();
     fs.mkdirSync(dir, { recursive: true });
+    // Limpa staging antigo antes de baixar o novo
     try {
       for (const f of fs.readdirSync(dir)) {
         if (ASSET_RE.test(f) && f !== latestInfo.name) {
-          try { fs.unlinkSync(path.join(dir, f)); } catch {}
+          safeUnlink(path.join(dir, f));
         }
       }
     } catch {}
@@ -251,7 +415,7 @@ async function downloadLatest(onProgress) {
     const { sha256 } = await downloadFile(latestInfo.url, dest, onProgress);
     if (latestInfo.digest) {
       if (sha256 !== latestInfo.digest) {
-        try { fs.unlinkSync(dest); } catch {}
+        safeUnlink(dest);
         throw new Error("Hash SHA-256 não confere — download corrompido");
       }
       log.info("update hash ok");
@@ -280,5 +444,8 @@ module.exports = {
   getLatest,
   downloadLatest,
   applyUpdateAndRelaunch,
-  resolveInstallPath,
+  getPortableLaunchPath,
+  resolveReplacePath,
+  cleanupOnStartup,
+  cleanupOldArtifacts,
 };

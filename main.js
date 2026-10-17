@@ -310,7 +310,9 @@ function getUiState() {
   const upd = updater.getLatest();
   const cfg = readCfg() || {};
   return {
-    version: APP_VERSION,
+    version: (() => {
+      try { return app.getVersion() || APP_VERSION; } catch { return APP_VERSION; }
+    })(),
     status: lastStatus || "Aguardando",
     phase: uiPhase,
     transmitting,
@@ -1003,8 +1005,14 @@ ipcMain.handle("ui:checkUpdateFlow", async () => {
     broadcastUiState();
     if (!info || !info.version) return { status: "uptodate" };
 
-    const detail = String(info.notes || "").trim().slice(0, 600)
-      || "Deseja baixar e instalar agora? O aplicativo será reiniciado.";
+    const replacePath = (() => {
+      try { return updater.resolveReplacePath(); } catch { return ""; }
+    })();
+    const detail = (String(info.notes || "").trim().slice(0, 500)
+      || "Deseja baixar e instalar agora? O app será reiniciado.")
+      + (replacePath
+        ? "\n\nO arquivo portable será substituído em:\n" + replacePath
+        : "\n\nO arquivo portable que você abriu será substituído no mesmo lugar.");
     const { response } = await dialog.showMessageBox(setup && !setup.isDestroyed() ? setup : undefined, {
       type: "question",
       buttons: ["Instalar", "Agora não"],
@@ -1315,6 +1323,13 @@ if (!app.requestSingleInstanceLock()) {
       updateTrayTooltip();
     } catch (e) {
       log.warn("update check", e && e.message);
+    }
+    try {
+      const replacePath = updater.resolveReplacePath();
+      if (replacePath) log.info("portable path", replacePath);
+      updater.cleanupOnStartup();
+    } catch (e) {
+      log.warn("update cleanup", e && e.message);
     }
     openPanel();
     if (readCfg()) startWorker();
