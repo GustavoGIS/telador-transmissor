@@ -4,6 +4,24 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
+
+// Antes de app.ready: pede encode H.264 por hardware (Media Foundation → NVENC na 4060)
+try {
+  if (process.platform === "win32") {
+    app.commandLine.appendSwitch("ignore-gpu-blocklist");
+    app.commandLine.appendSwitch("enable-gpu-rasterization");
+    app.commandLine.appendSwitch("enable-zero-copy");
+    app.commandLine.appendSwitch(
+      "enable-features",
+      [
+        "PlatformH264CbpEncoding",
+        "MediaFoundationH264CbpEncoding",
+        "CanvasOopRasterization",
+      ].join(",")
+    );
+  }
+} catch {}
+
 const processAudio = require("./processAudio");
 const log = require("./log");
 const updater = require("./updater");
@@ -118,7 +136,7 @@ let updateProgress = 0;
 let shareQueue = Promise.resolve();
 let crashRestarts = [];
 let isQuitting = false;
-let liveStats = { bitrate: 0, loss: 0, rtt: 0, codec: "", health: "idle" };
+let liveStats = { bitrate: 0, loss: 0, rtt: 0, codec: "", health: "idle", fps: 0 };
 let boundsSaveTimer = null;
 let pendingPresent = null;
 
@@ -312,7 +330,7 @@ function setTransmitting(on, statusText) {
   }
   if (was && !next) {
     clearActiveSource();
-    liveStats = { bitrate: 0, loss: 0, rtt: 0, codec: "", health: "idle" };
+    liveStats = { bitrate: 0, loss: 0, rtt: 0, codec: "", health: "idle", fps: 0 };
   }
   if (statusText != null) lastStatus = String(statusText);
   if (next && switchingSource) uiPhase = "switching";
@@ -1114,6 +1132,7 @@ ipcMain.on("stats:update", (_e, s) => {
     rtt: Number(s.rtt) || 0,
     codec: String(s.codec || ""),
     health: String(s.health || "ok"),
+    fps: Number(s.fps) || 0,
   };
   broadcastUiState();
 });

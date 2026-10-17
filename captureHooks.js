@@ -26,21 +26,34 @@
     (window.__teladorPubOpts &&
       window.__teladorPubOpts.screenShareEncoding &&
       window.__teladorPubOpts.screenShareEncoding.maxBitrate) ||
-      4e6
+      14e6
   );
   const VIDEO_BITRATE = {
-    excellent: Math.round(baseBitrate * 1.25),
+    excellent: Math.round(baseBitrate * 1.15),
     good: baseBitrate,
-    poor: Math.round(baseBitrate * 0.55),
-    lost: Math.max(1e6, Math.round(baseBitrate * 0.35)),
+    // Adaptive menos agressivo: não esmaga 1080p60 pra bitrate de “economia”
+    poor: Math.round(baseBitrate * 0.7),
+    lost: Math.max(2.5e6, Math.round(baseBitrate * 0.45)),
   };
+
+  function targetFps() {
+    try {
+      const enc = window.__teladorPubOpts && window.__teladorPubOpts.screenShareEncoding;
+      const fromPub = enc && enc.maxFramerate;
+      const res = window.__teladorShareOpts && window.__teladorShareOpts.resolution;
+      const fromShare = res && res.frameRate;
+      const n = Number(fromPub != null ? fromPub : fromShare);
+      if (Number.isFinite(n) && n > 0) return Math.min(60, Math.max(15, Math.round(n)));
+    } catch (e) {}
+    return 30;
+  }
 
   // Preserva opts injetados pelo main (quality.js); só preenche se ausentes
   if (!window.__teladorShareOpts) {
     window.__teladorShareOpts = {
       audio: true,
       systemAudio: "include",
-      resolution: { width: 1280, height: 720, frameRate: 30 },
+      resolution: { width: 1920, height: 1080, frameRate: 60 },
       contentHint: "motion",
     };
   }
@@ -49,7 +62,7 @@
       videoCodec: "h264",
       simulcast: false,
       degradationPreference: "maintain-framerate",
-      screenShareEncoding: { maxBitrate: VIDEO_BITRATE.good, maxFramerate: 30, priority: "high" },
+      screenShareEncoding: { maxBitrate: VIDEO_BITRATE.good, maxFramerate: 60, priority: "high" },
       dtx: false,
       red: false,
       forceStereo: true,
@@ -430,7 +443,7 @@
       const next = Number(maxBitrate) || 0;
       if (!next || Math.abs(cur - next) < 50e3) return;
       params.encodings[0].maxBitrate = next;
-      params.encodings[0].maxFramerate = 30;
+      params.encodings[0].maxFramerate = targetFps();
       await rtp.setParameters(params);
       window.__teladorLastBitrate = next;
     } catch (e) {
@@ -450,9 +463,11 @@
         let packets = 0;
         let lost = 0;
         let rtt = 0;
+        let framesPerSecond = 0;
         stats.forEach((r) => {
           if (r.type === "outbound-rtp" && (r.kind === "video" || r.mediaType === "video")) {
             packets += Number(r.packetsSent) || 0;
+            if (r.framesPerSecond != null) framesPerSecond = Math.max(framesPerSecond, Number(r.framesPerSecond) || 0);
           }
           if (r.type === "remote-inbound-rtp" && (r.kind === "video" || r.mediaType === "video")) {
             if (r.roundTripTime != null) rtt = Math.max(rtt, Number(r.roundTripTime) * 1000);
@@ -489,7 +504,7 @@
         } catch (e2) {}
         try {
           if (window.telador && typeof window.telador.setStats === "function") {
-            window.telador.setStats({ bitrate, loss: lossRate, rtt, codec, health });
+            window.telador.setStats({ bitrate, loss: lossRate, rtt, codec, health, fps: framesPerSecond });
           }
         } catch (e3) {}
       } catch (e) {}
@@ -500,7 +515,7 @@
     try {
       const enc = (window.__teladorPubOpts && window.__teladorPubOpts.screenShareEncoding) || {};
       const maxBitrate = Number(enc.maxBitrate) || VIDEO_BITRATE.good;
-      const maxFramerate = Number(enc.maxFramerate) || 30;
+      const maxFramerate = Number(enc.maxFramerate) || targetFps();
       const { videoPub } = findScreenPubs(getLP());
       const track = videoPub && videoPub.track;
       const rtp = track && track.sender;
@@ -555,11 +570,22 @@
       md.getDisplayMedia = async (constraints = {}) => {
         const next = Object.assign({}, constraints);
         next.audio = false;
+        const fps = targetFps();
+        const res = (window.__teladorShareOpts && window.__teladorShareOpts.resolution) || {};
+        const w = Number(res.width) || 1920;
+        const h = Number(res.height) || 1080;
+        const fpsConstraint = { ideal: fps, max: fps };
         if (!next.video || next.video === true) {
-          next.video = { frameRate: { ideal: 30, max: 30 } };
+          next.video = {
+            width: { ideal: w },
+            height: { ideal: h },
+            frameRate: fpsConstraint,
+          };
         } else if (typeof next.video === "object") {
           next.video = Object.assign({}, next.video, {
-            frameRate: next.video.frameRate != null ? next.video.frameRate : { ideal: 30, max: 30 },
+            width: next.video.width != null ? next.video.width : { ideal: w },
+            height: next.video.height != null ? next.video.height : { ideal: h },
+            frameRate: next.video.frameRate != null ? next.video.frameRate : fpsConstraint,
           });
         }
         const stream = await orig(next);
@@ -809,7 +835,7 @@
         name: "screen-" + Date.now(),
         screenShareEncoding: Object.assign({}, enc, {
           maxBitrate: VIDEO_BITRATE.good,
-          maxFramerate: enc.maxFramerate || 30,
+          maxFramerate: enc.maxFramerate || targetFps(),
         }),
       });
       delete pubOpts.backupCodec;
@@ -823,9 +849,9 @@
           name: "screen-" + Date.now(),
           screenShareEncoding: {
             maxBitrate: VIDEO_BITRATE.good,
-            maxFramerate: (enc && enc.maxFramerate) || 30,
+            maxFramerate: (enc && enc.maxFramerate) || targetFps(),
           },
-          degradationPreference: "maintain-resolution",
+          degradationPreference: "maintain-framerate",
         });
       }
 
@@ -926,7 +952,8 @@
                 VIDEO_BITRATE.excellent
               );
               pubOpts.screenShareEncoding.maxFramerate =
-                Number(pubOpts.screenShareEncoding.maxFramerate) || 30;
+                Number(pubOpts.screenShareEncoding.maxFramerate) || targetFps();
+              pubOpts.degradationPreference = pubOpts.degradationPreference || "maintain-framerate";
               pubOpts.dtx = false;
               pubOpts.red = false;
               pubOpts.forceStereo = true;
@@ -943,7 +970,10 @@
                     videoCodec: "vp8",
                     simulcast: false,
                     name: "screen-" + Date.now(),
-                    screenShareEncoding: { maxBitrate: VIDEO_BITRATE.poor, maxFramerate: 30 },
+                    screenShareEncoding: {
+                      maxBitrate: VIDEO_BITRATE.good,
+                      maxFramerate: targetFps(),
+                    },
                     degradationPreference: "maintain-framerate",
                   });
                 } catch (err2) {

@@ -183,26 +183,26 @@
 
   function readCustom() {
     return {
-      width: parseInt(cqW.value, 10) || 1280,
-      height: parseInt(cqH.value, 10) || 720,
-      frameRate: parseInt(cqFps.value, 10) || 30,
-      maxBitrate: Math.round((parseFloat(cqBr.value) || 4) * 1e6),
+      width: parseInt(cqW.value, 10) || 1920,
+      height: parseInt(cqH.value, 10) || 1080,
+      frameRate: parseInt(cqFps.value, 10) || 60,
+      maxBitrate: Math.round((parseFloat(cqBr.value) || 14) * 1e6),
     };
   }
 
   function fillCustom(c) {
     const x = c || {};
-    cqW.value = x.width || 1280;
-    cqH.value = x.height || 720;
-    cqFps.value = x.frameRate || 30;
-    cqBr.value = x.maxBitrate ? (x.maxBitrate / 1e6) : 4;
+    cqW.value = x.width || 1920;
+    cqH.value = x.height || 1080;
+    cqFps.value = x.frameRate || 60;
+    cqBr.value = x.maxBitrate ? (x.maxBitrate / 1e6) : 14;
   }
 
   function fillPresets(presets, selected) {
     const list = Array.isArray(presets) && presets.length
       ? presets
       : [
-          { id: "high", label: "Alta (1080p)" },
+          { id: "high", label: "Alta (1080p60)" },
           { id: "balanced", label: "Equilibrada (720p)" },
           { id: "economy", label: "Economia" },
           { id: "custom", label: "Personalizado" },
@@ -348,12 +348,15 @@
     };
     healthText.textContent = labels[health] || "Rede —";
 
-    if (ui.transmitting && (s.bitrate || s.rtt || s.loss != null)) {
+    if (ui.transmitting && (s.bitrate || s.rtt || s.loss != null || s.fps)) {
       const mb = s.bitrate ? (s.bitrate / 1e6).toFixed(1) + " Mb/s" : "—";
       const loss = s.loss != null ? (s.loss * 100).toFixed(1) + "%" : "—";
       const rtt = s.rtt ? Math.round(s.rtt) + " ms" : "—";
-      statsText.textContent = mb + " · perda " + loss + " · RTT " + rtt
-        + (s.codec ? " · " + s.codec.replace("video/", "") : "");
+      const fps = s.fps ? Math.round(s.fps) + " fps" : "";
+      statsText.textContent = [mb, fps, "perda " + loss, "RTT " + rtt]
+        .concat(s.codec ? [s.codec.replace("video/", "")] : [])
+        .filter(Boolean)
+        .join(" · ");
     } else {
       statsText.textContent = "";
     }

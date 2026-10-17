@@ -2,11 +2,11 @@
 const PRESETS = {
   high: {
     id: "high",
-    label: "Alta (1080p)",
+    label: "Alta (1080p60)",
     width: 1920,
     height: 1080,
-    frameRate: 30,
-    maxBitrate: 10e6,
+    frameRate: 60,
+    maxBitrate: 14e6,
   },
   balanced: {
     id: "balanced",
@@ -14,7 +14,7 @@ const PRESETS = {
     width: 1280,
     height: 720,
     frameRate: 30,
-    maxBitrate: 4e6,
+    maxBitrate: 5e6,
   },
   economy: {
     id: "economy",
@@ -22,15 +22,15 @@ const PRESETS = {
     width: 1280,
     height: 720,
     frameRate: 24,
-    maxBitrate: 2e6,
+    maxBitrate: 2.5e6,
   },
   custom: {
     id: "custom",
     label: "Personalizado",
-    width: 1280,
-    height: 720,
-    frameRate: 30,
-    maxBitrate: 4e6,
+    width: 1920,
+    height: 1080,
+    frameRate: 60,
+    maxBitrate: 14e6,
   },
 };
 
@@ -45,10 +45,11 @@ function resolvePreset(id, custom) {
     return {
       id: "custom",
       label: "Personalizado",
-      width: Math.min(1920, Math.max(640, parseInt(custom.width, 10) || 1280)),
-      height: Math.min(1080, Math.max(360, parseInt(custom.height, 10) || 720)),
-      frameRate: Math.min(60, Math.max(15, parseInt(custom.frameRate, 10) || 30)),
-      maxBitrate: Math.min(12e6, Math.max(1e6, parseInt(custom.maxBitrate, 10) || 4e6)),
+      width: Math.min(1920, Math.max(640, parseInt(custom.width, 10) || 1920)),
+      height: Math.min(1080, Math.max(360, parseInt(custom.height, 10) || 1080)),
+      frameRate: Math.min(60, Math.max(15, parseInt(custom.frameRate, 10) || 60)),
+      // 1080p60 com movimento precisa de folga; 20 Mb/s ainda é pouco vs 800 Mbps de link
+      maxBitrate: Math.min(20e6, Math.max(1e6, parseInt(custom.maxBitrate, 10) || 14e6)),
     };
   }
   return PRESETS[pid] || PRESETS.balanced;

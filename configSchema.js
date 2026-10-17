@@ -29,10 +29,10 @@ function asBool(v, fallback) {
 
 function normalizeCustom(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const width = Math.min(1920, Math.max(640, parseInt(raw.width, 10) || 1280));
-  const height = Math.min(1080, Math.max(360, parseInt(raw.height, 10) || 720));
-  const frameRate = Math.min(60, Math.max(15, parseInt(raw.frameRate, 10) || 30));
-  const maxBitrate = Math.min(12e6, Math.max(1e6, parseInt(raw.maxBitrate, 10) || 4e6));
+  const width = Math.min(1920, Math.max(640, parseInt(raw.width, 10) || 1920));
+  const height = Math.min(1080, Math.max(360, parseInt(raw.height, 10) || 1080));
+  const frameRate = Math.min(60, Math.max(15, parseInt(raw.frameRate, 10) || 60));
+  const maxBitrate = Math.min(20e6, Math.max(1e6, parseInt(raw.maxBitrate, 10) || 14e6));
   return { width, height, frameRate, maxBitrate };
 }
 
