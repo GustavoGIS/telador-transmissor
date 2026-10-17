@@ -43,7 +43,7 @@
       {
         "provider": "github",
         "owner": "GustavoGIS",
-        "repo": "telador",
+        "repo": "telador-transmissor",
         "releaseType": "release"
       }
     ]

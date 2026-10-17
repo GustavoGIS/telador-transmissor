@@ -6,7 +6,7 @@ const http = require("http");
 const crypto = require("crypto");
 const log = require("./log");
 
-const REPO = "GustavoGIS/telador";
+const REPO = "GustavoGIS/telador-transmissor";
 const ASSET_RE = /^Telador-Transmissor-.*\.exe$/i;
 
 let latestInfo = null;

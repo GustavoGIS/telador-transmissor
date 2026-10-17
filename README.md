@@ -123,7 +123,9 @@ Arquivos-chave:
 - Stack: Electron, electron-builder **portable** Windows
 - Versão atual: ver `package.json` (`0.2.5` no momento deste README)
 - Artefato: `Telador-Transmissor-${version}.exe`
-- Releases publicadas no GitHub do monorepo de produto: `GustavoGIS/telador` (config `build.publish`)
+- Releases deste app: GitHub Releases neste repo (`GustavoGIS/telador-transmissor`)
+- Releases antigas (até v0.2.1) ficaram em `GustavoGIS/telador`
+- Auto-update do app consulta as Releases deste repositório
 - Áudio nativo: `npm run build:native` (C# → `native/audio-exclude.exe`)
 
 Comandos:
@@ -171,5 +173,5 @@ Não commitar configs de usuário nem logs.
 
 ## Contato do repositório
 
-- App: este repo (`telador-transmissor`)
-- Produto / site / releases do `.exe`: [GustavoGIS/telador](https://github.com/GustavoGIS/telador)
+- App + releases do `.exe`: [GustavoGIS/telador-transmissor](https://github.com/GustavoGIS/telador-transmissor)
+- Site / produto Telador: [GustavoGIS/telador](https://github.com/GustavoGIS/telador)
