@@ -1,9 +1,10 @@
-const { app, shell } = require("electron");
+const { app } = require("electron");
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
 const http = require("http");
 const crypto = require("crypto");
+const { spawn } = require("child_process");
 const log = require("./log");
 
 const REPO = "GustavoGIS/telador-transmissor";
@@ -101,6 +102,98 @@ function normalizeDigest(d) {
   return m ? m[1] : "";
 }
 
+/** Caminho do .exe que o usuário abre (atalho/Downloads), não o unpack em %TEMP%. */
+function resolveInstallPath() {
+  try {
+    const portable = process.env.PORTABLE_EXECUTABLE_FILE;
+    if (portable && typeof portable === "string" && fs.existsSync(portable)) {
+      return path.resolve(portable);
+    }
+  } catch {}
+  try {
+    if (app.isPackaged && process.execPath) {
+      const exec = path.resolve(process.execPath);
+      const temp = path.resolve(app.getPath("temp"));
+      // Portable do electron-builder roda de pasta temp — não sobrescrever isso
+      if (exec.toLowerCase().startsWith(temp.toLowerCase() + path.sep)) {
+        return null;
+      }
+      return exec;
+    }
+  } catch {}
+  return null;
+}
+
+function cmdQuote(p) {
+  return `"${String(p).replace(/"/g, "")}"`;
+}
+
+/**
+ * Troca o .exe original pelo baixado e relança.
+ * Antes só abria a cópia em userData/updates — o atalho do 0.2.5 continuava antigo.
+ */
+function applyDownloaded(exePath) {
+  const downloaded = path.resolve(exePath);
+  if (!fs.existsSync(downloaded)) {
+    throw new Error("Arquivo de update não encontrado");
+  }
+
+  const installPath = resolveInstallPath();
+  log.info("applying update", {
+    downloaded,
+    installPath: installPath || "(none)",
+    portableFile: process.env.PORTABLE_EXECUTABLE_FILE || "",
+    portableDir: process.env.PORTABLE_EXECUTABLE_DIR || "",
+  });
+
+  // Dev ou sem caminho estável: só abre o baixado
+  if (!installPath || path.resolve(installPath) === downloaded) {
+    spawn(downloaded, [], { detached: true, stdio: "ignore" }).unref();
+    setTimeout(() => {
+      try { app.quit(); } catch {}
+    }, 400);
+    return true;
+  }
+
+  // Sobrescreve o mesmo caminho do atalho (ex.: ...\Telador-Transmissor-0.2.5.exe)
+  // para o atalho continuar válido; a versão real vem de dentro do app.
+  const finalPath = installPath;
+  const pid = process.pid;
+  const scriptPath = path.join(app.getPath("temp"), `telador-update-${pid}-${Date.now()}.cmd`);
+
+  const lines = [
+    "@echo off",
+    "setlocal",
+    ":wait",
+    `tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul`,
+    "if not errorlevel 1 (",
+    "  timeout /t 1 /nobreak >nul",
+    "  goto wait",
+    ")",
+    "timeout /t 1 /nobreak >nul",
+    `copy /Y ${cmdQuote(downloaded)} ${cmdQuote(finalPath)}`,
+    "if errorlevel 1 (",
+    `  start "" ${cmdQuote(downloaded)}`,
+    "  goto cleanup",
+    ")",
+    `start "" ${cmdQuote(finalPath)}`,
+    ":cleanup",
+    'del /F /Q "%~f0" 2>nul',
+  ];
+
+  fs.writeFileSync(scriptPath, lines.join("\r\n"), "utf8");
+  spawn("cmd.exe", ["/c", scriptPath], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  }).unref();
+
+  setTimeout(() => {
+    try { app.quit(); } catch {}
+  }, 400);
+  return true;
+}
+
 async function checkForUpdates() {
   try {
     const data = await getJson(`https://api.github.com/repos/${REPO}/releases/latest`);
@@ -182,23 +275,10 @@ async function applyUpdateAndRelaunch() {
   return applyDownloaded(p);
 }
 
-function applyDownloaded(exePath) {
-  log.info("applying update", exePath);
-  try {
-    shell.openPath(exePath);
-  } catch (e) {
-    log.error("open update failed", e && e.message);
-    throw e;
-  }
-  setTimeout(() => {
-    try { app.quit(); } catch {}
-  }, 500);
-  return true;
-}
-
 module.exports = {
   checkForUpdates,
   getLatest,
   downloadLatest,
   applyUpdateAndRelaunch,
+  resolveInstallPath,
 };
