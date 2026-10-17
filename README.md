@@ -111,7 +111,7 @@ Arquivos-chave:
 
 - Conectar / Verificar (pré-voo: áudio exe, LiveKit, token, SDK)
 - Lista Telas / Aplicativos, Transmitir / Parar
-- Qualidade: Muito alto (1080p60), Alto (1080p30), Equilibrado (720p30), Economia (720p20), Personalizado
+- Qualidade: Alto (1080p30), Equilibrado (720p30), Economia (720p20), Personalizado
 - Opções: reiniciar, testar áudio, verificar updates, diagnóstico, logs, sair
 - Feedback em **toast** (não embutido no formulário)
 - Fechar janela → app fica na **bandeja**; atalhos Ctrl+Shift+T / S / R

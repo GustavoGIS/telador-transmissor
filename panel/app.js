@@ -202,18 +202,19 @@
     const list = Array.isArray(presets) && presets.length
       ? presets
       : [
-          { id: "ultra", label: "Muito alto (1080p60)" },
           { id: "high", label: "Alto (1080p30)" },
           { id: "balanced", label: "Equilibrado (720p30)" },
           { id: "economy", label: "Economia (720p20)" },
           { id: "custom", label: "Personalizado" },
         ];
+    const sel = selected === "ultra" ? "high" : selected;
     qualityEl.innerHTML = "";
     for (const p of list) {
+      if (p.id === "ultra") continue;
       const opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.label;
-      if (p.id === selected) opt.selected = true;
+      if (p.id === sel) opt.selected = true;
       qualityEl.appendChild(opt);
     }
     customBox.hidden = qualityEl.value !== "custom";

@@ -13,10 +13,9 @@ try {
   app.commandLine.appendSwitch("webrtc-max-cpu-consumption-percentage", "100");
   // Switch real do Chromium (= kWebRtcMaxCaptureFramerate); "webrtc-max-capture-framerate" é alias informal
   app.commandLine.appendSwitch("max-gum-fps", "60");
-  app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
-  // NVIDIA às vezes aplica "FPS de app em segundo plano" no portable empacotado
-  app.commandLine.appendSwitch("disable-gpu-vsync");
-  app.commandLine.appendSwitch("disable-frame-rate-limit");
+  // NÃO usar disable-gpu-vsync / disable-frame-rate-limit aqui: deixam o compositor
+  // sem teto em todos os renderers (~20–30% GPU mesmo sem transmitir).
+  // max-gum-fps + webrtc CPU 100% já liberam a captura; o worker desliga throttling só no TX.
 
   if (process.platform === "win32") {
     app.commandLine.appendSwitch("ignore-gpu-blocklist");
@@ -159,6 +158,20 @@ function setPowerBlock(on) {
     } else if (powerBlockerId != null && powerSaveBlocker.isStarted(powerBlockerId)) {
       powerSaveBlocker.stop(powerBlockerId);
       powerBlockerId = null;
+    }
+  } catch {}
+}
+
+/** Idle: throttling + frame rate baixo no worker oculto. TX: sem throttling. */
+function applyWorkerPerfMode(forTransmit) {
+  if (!worker || worker.isDestroyed()) return;
+  const tx = !!forTransmit;
+  try {
+    worker.webContents.setBackgroundThrottling(!tx);
+  } catch {}
+  try {
+    if (typeof worker.webContents.setFrameRate === "function") {
+      worker.webContents.setFrameRate(tx ? 60 : 5);
     }
   } catch {}
 }
@@ -348,6 +361,7 @@ function setTransmitting(on, statusText) {
     transmitting = next;
     updateTrayIcon();
     setPowerBlock(next);
+    applyWorkerPerfMode(next);
     try { winTimer.setStreamingTimers(next); } catch {}
     // Som só na borda real: começou / parou (qualquer motivo)
     if (next) playCue("tx-start");
@@ -643,11 +657,12 @@ function startWorker() {
         webPreferences: {
           preload: path.join(__dirname, "preload.js"),
           contextIsolation: true,
-          backgroundThrottling: false,
+          // Idle = throttling on (economiza GPU); TX liga perf mode em setTransmitting
+          backgroundThrottling: !transmitting,
         },
       });
       applyWindowIcon(worker);
-      try { worker.webContents.setBackgroundThrottling(false); } catch {}
+      applyWorkerPerfMode(transmitting);
       worker.webContents.setAudioMuted(true);
       worker.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       worker.webContents.on("did-finish-load", () => {
@@ -1268,12 +1283,12 @@ if (!app.requestSingleInstanceLock()) {
     baseIcon = loadAppIcon();
     try {
       const caps = winPlatform.describe();
-      const powerOk = winTimer.optOutPowerThrottling();
+      // HighQoS / timeBeginPeriod só enquanto transmite (winTimer.setStreamingTimers)
       log.info("win platform", {
         build: caps.build,
         isWin11: caps.isWin11,
         wgcScreenCapturer: caps.wgcScreen ? "on" : "off",
-        powerThrottlingOptOut: powerOk ? "on" : "off",
+        powerThrottlingOptOut: "on-transmit",
       });
     } catch (e) {
       log.warn("win platform init", e && e.message);

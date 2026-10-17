@@ -1,13 +1,5 @@
 /** Presets de qualidade compartilhados (main / painel via IPC). */
 const PRESETS = {
-  ultra: {
-    id: "ultra",
-    label: "Muito alto (1080p60)",
-    width: 1920,
-    height: 1080,
-    frameRate: 60,
-    maxBitrate: 14e6,
-  },
   high: {
     id: "high",
     label: "Alto (1080p30)",
@@ -44,6 +36,8 @@ const PRESETS = {
 
 function resolvePresetId(id) {
   if (id === "custom") return "custom";
+  // preset removido: quem tinha "ultra" cai em Alto (1080p30)
+  if (id === "ultra") return "high";
   return PRESETS[id] ? id : "balanced";
 }
 

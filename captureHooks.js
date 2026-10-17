@@ -727,6 +727,12 @@
 
   window.__forceStopShare = async () => {
     try {
+      if (window.__teladorAdaptiveTimer) {
+        clearInterval(window.__teladorAdaptiveTimer);
+        window.__teladorAdaptiveTimer = null;
+      }
+    } catch (e) {}
+    try {
       if (typeof window.__teladorNativeAudioCleanup === "function") {
         await window.__teladorNativeAudioCleanup();
         window.__teladorNativeAudioCleanup = null;
