@@ -41,14 +41,14 @@
       audio: true,
       systemAudio: "include",
       resolution: { width: 1280, height: 720, frameRate: 30 },
-      contentHint: "detail",
+      contentHint: "motion",
     };
   }
   if (!window.__teladorPubOpts) {
     window.__teladorPubOpts = {
       videoCodec: "h264",
       simulcast: false,
-      degradationPreference: "maintain-resolution",
+      degradationPreference: "maintain-framerate",
       screenShareEncoding: { maxBitrate: VIDEO_BITRATE.good, maxFramerate: 30, priority: "high" },
       dtx: false,
       red: false,
@@ -565,7 +565,7 @@
         const stream = await orig(next);
         const vt = stream.getVideoTracks()[0];
         if (vt) {
-          try { if ("contentHint" in vt) vt.contentHint = "detail"; } catch (e) {}
+          try { if ("contentHint" in vt) vt.contentHint = "motion"; } catch (e) {}
         }
         if (!videoTrackLooksAlive(stream)) {
           tlog("error", "video track inválida após getDisplayMedia");
@@ -944,7 +944,7 @@
                     simulcast: false,
                     name: "screen-" + Date.now(),
                     screenShareEncoding: { maxBitrate: VIDEO_BITRATE.poor, maxFramerate: 30 },
-                    degradationPreference: "maintain-resolution",
+                    degradationPreference: "maintain-framerate",
                   });
                 } catch (err2) {
                   throw err;

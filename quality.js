@@ -6,7 +6,7 @@ const PRESETS = {
     width: 1920,
     height: 1080,
     frameRate: 30,
-    maxBitrate: 8e6,
+    maxBitrate: 10e6,
   },
   balanced: {
     id: "balanced",
@@ -67,7 +67,8 @@ function toShareOpts(preset) {
     audio: true,
     systemAudio: "include",
     resolution: { width: p.width, height: p.height, frameRate: p.frameRate },
-    contentHint: "detail",
+    // motion mantém fps; detail faz o encoder largar frames sob carga
+    contentHint: "motion",
   };
 }
 
@@ -76,7 +77,8 @@ function toPubOpts(preset) {
   return {
     videoCodec: "h264",
     simulcast: false,
-    degradationPreference: "maintain-resolution",
+    // framerate primeiro — maintain-resolution oscilava ~15–21fps em 1080p
+    degradationPreference: "maintain-framerate",
     screenShareEncoding: {
       maxBitrate: p.maxBitrate,
       maxFramerate: p.frameRate,
