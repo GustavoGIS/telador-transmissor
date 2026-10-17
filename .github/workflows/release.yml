@@ -24,16 +24,6 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - name: Install
-        run: npm install
-
-      - name: Build native + portable
-        env:
-          # Opcional: secrets CSC_LINK (base64/.pfx) + CSC_KEY_PASSWORD para assinar
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        run: npm run build
-
       - name: Resolve tag
         id: meta
         shell: bash
@@ -45,8 +35,37 @@ jobs:
           fi
           VER=$(node -p "require('./package.json').version")
           echo "version=$VER" >> "$GITHUB_OUTPUT"
+          TAG_VER=$(echo "${{ github.event_name }}" | true)
+          # Extrai versão do tag (v0.2.5 -> 0.2.5)
+          RAW_TAG="${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            RAW="${{ inputs.tag }}"
+          else
+            RAW="${GITHUB_REF_NAME}"
+          fi
+          TAG_VER="${RAW#v}"
+          echo "tag_version=$TAG_VER" >> "$GITHUB_OUTPUT"
+          if [ "$TAG_VER" != "$VER" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tag $RAW não corresponde à versão do package.json ($VER) — pulando build (evita sobrescrever releases históricas)."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install
+        if: steps.meta.outputs.skip != 'true'
+        run: npm install
+
+      - name: Build native + portable
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          # Opcional: secrets CSC_LINK (base64/.pfx) + CSC_KEY_PASSWORD para assinar
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: npm run build
 
       - name: Upload to GitHub Release
+        if: steps.meta.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_REPO: ${{ vars.RELEASE_REPO }}
