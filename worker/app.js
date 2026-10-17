@@ -168,7 +168,7 @@ async function run() {
   }
 }
 
-function onData(payload, _participant, _kind, topic) {
+function onData(payload, participant, _kind, topic) {
   if (topic !== "telador") return;
   let msg;
   try {
@@ -177,8 +177,16 @@ function onData(payload, _participant, _kind, topic) {
     return;
   }
   if (msg.type !== "present") return;
-  if (msg.target === room.localParticipant.name) {
-    try { T.gesture(); } catch (e) {}
+  const localName = room && room.localParticipant && room.localParticipant.name;
+  if (msg.target === localName) {
+    const from = (participant && (participant.name || participant.identity))
+      || msg.from
+      || "";
+    try {
+      if (T && typeof T.requestPresent === "function") {
+        T.requestPresent({ target: msg.target, from: String(from || "") });
+      }
+    } catch (e) {}
   } else if (typeof window.__forceStopShare === "function") {
     window.__forceStopShare();
   } else if (typeof window.__stopShare === "function") {

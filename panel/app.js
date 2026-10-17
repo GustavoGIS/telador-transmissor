@@ -13,6 +13,9 @@
   const toast = $("toast");
   const toastText = $("toastText");
   const toastIco = $("toastIco");
+  const toastActions = $("toastActions");
+  const toastAccept = $("toastAccept");
+  const toastDecline = $("toastDecline");
   const dot = $("dot");
   const hdot = $("hdot");
   const healthText = $("healthText");
@@ -43,6 +46,8 @@
   let thumbsLoading = false;
   let scrollTop = 0;
   let toastTimer = null;
+  let stickyPresent = false;
+  let presentResponding = false;
 
   const PHASE_LABEL = {
     idle: "Aguardando",
@@ -60,17 +65,72 @@
   }
 
   function hideToast() {
+    if (stickyPresent) return;
     if (toastTimer) {
       clearTimeout(toastTimer);
       toastTimer = null;
     }
     toast.classList.remove("is-on");
     setTimeout(() => {
-      if (!toast.classList.contains("is-on")) toast.hidden = true;
+      if (!toast.classList.contains("is-on") && !stickyPresent) toast.hidden = true;
     }, 200);
   }
 
+  function clearPresentToastUi() {
+    stickyPresent = false;
+    presentResponding = false;
+    if (toastActions) toastActions.hidden = true;
+    toast.classList.remove("is-action");
+    if (toastAccept) toastAccept.disabled = false;
+    if (toastDecline) toastDecline.disabled = false;
+  }
+
+  function showPresentToast(info) {
+    const from = info && info.from ? String(info.from).trim() : "";
+    const msg = from
+      ? `Pedido de transmissão de ${from}. Aceitar?`
+      : "Pedido de transmissão pela sala. Aceitar?";
+    stickyPresent = true;
+    if (toastTimer) {
+      clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+    toast.hidden = false;
+    toast.classList.remove("is-error", "is-ok", "is-warn");
+    toast.classList.add("is-warn", "is-action");
+    toastText.textContent = msg;
+    setIcon(toastIco, "#i-broadcast");
+    if (toastActions) toastActions.hidden = false;
+    if (toastAccept) toastAccept.disabled = false;
+    if (toastDecline) toastDecline.disabled = false;
+    requestAnimationFrame(() => toast.classList.add("is-on"));
+  }
+
+  function hidePresentToast() {
+    clearPresentToastUi();
+    toast.classList.remove("is-on", "is-warn", "is-error", "is-ok");
+    setTimeout(() => {
+      if (!toast.classList.contains("is-on") && !stickyPresent) toast.hidden = true;
+    }, 200);
+  }
+
+  async function respondPresent(accepted) {
+    if (!stickyPresent || presentResponding) return;
+    presentResponding = true;
+    if (toastAccept) toastAccept.disabled = true;
+    if (toastDecline) toastDecline.disabled = true;
+    try {
+      if (window.telador && window.telador.respondPresent) {
+        await window.telador.respondPresent(!!accepted);
+      }
+    } catch (e) {}
+    hidePresentToast();
+    if (accepted) setHint("Iniciando transmissão…", "ok");
+    else setHint("Pedido recusado", "warn");
+  }
+
   function setHint(text, kind) {
+    if (stickyPresent) return;
     const t = String(text || "").trim();
     if (!t) {
       hideToast();
@@ -78,8 +138,9 @@
     }
     const k = kind === "error" || kind === "warn" || kind === "ok" ? kind : "ok";
     toast.hidden = false;
-    toast.classList.remove("is-error", "is-ok", "is-warn");
+    toast.classList.remove("is-error", "is-ok", "is-warn", "is-action");
     toast.classList.add("is-" + k);
+    if (toastActions) toastActions.hidden = true;
     toastText.textContent = t;
     setIcon(toastIco, k === "error" ? "#i-warn" : (k === "warn" ? "#i-warn" : "#i-check"));
     requestAnimationFrame(() => toast.classList.add("is-on"));
@@ -376,6 +437,12 @@
 
     if (state.firstRunSeen === false) {
       openModal("firstRunModal", true);
+    }
+
+    if (state.pendingPresent) {
+      showPresentToast(state.pendingPresent);
+    } else if (stickyPresent && !presentResponding) {
+      hidePresentToast();
     }
   }
 
@@ -703,7 +770,12 @@
     try { await window.telador.firstRunSeen(); } catch (e) {}
   };
 
-  $("toastClose").onclick = () => hideToast();
+  $("toastClose").onclick = () => {
+    if (stickyPresent) respondPresent(false);
+    else hideToast();
+  };
+  if (toastAccept) toastAccept.onclick = () => respondPresent(true);
+  if (toastDecline) toastDecline.onclick = () => respondPresent(false);
 
   (async () => {
     setBoot(true, "Carregando…");
@@ -731,6 +803,15 @@
       window.telador.onUiState(applyUi);
       if (window.telador.onConfirmQuit) {
         window.telador.onConfirmQuit(() => openModal("quitModal", true));
+      }
+      if (window.telador.onSound) {
+        window.telador.onSound((name) => {
+          try {
+            if (window.teladorSounds && typeof window.teladorSounds.play === "function") {
+              window.teladorSounds.play(name);
+            }
+          } catch (e) {}
+        });
       }
     } catch (e) {
       setHint("Erro: " + (e.message || e), "error");

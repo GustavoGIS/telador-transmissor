@@ -76,6 +76,7 @@ let crashRestarts = [];
 let isQuitting = false;
 let liveStats = { bitrate: 0, loss: 0, rtt: 0, codec: "", health: "idle" };
 let boundsSaveTimer = null;
+let pendingPresent = null;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -231,6 +232,9 @@ function getUiState() {
     stats: liveStats,
     firstRunSeen: !!cfg.firstRunSeen,
     trayClickAction: cfg.trayClickAction || "panel",
+    pendingPresent: pendingPresent
+      ? { target: pendingPresent.target || "", from: pendingPresent.from || "", at: pendingPresent.at || 0 }
+      : null,
   };
 }
 
@@ -242,12 +246,25 @@ function broadcastUiState() {
   } catch {}
 }
 
+function playCue(name) {
+  const n = String(name || "");
+  if (!n || isQuitting) return;
+  try {
+    if (setup && !setup.isDestroyed()) {
+      setup.webContents.send("ui:sound", n);
+    }
+  } catch {}
+}
+
 function setTransmitting(on, statusText) {
   const next = !!on;
   const was = transmitting;
   if (next !== was) {
     transmitting = next;
     updateTrayIcon();
+    // Som só na borda real: começou / parou (qualquer motivo)
+    if (next) playCue("tx-start");
+    else playCue("tx-stop");
   }
   if (was && !next) {
     clearActiveSource();
@@ -496,7 +513,9 @@ async function destroyWorkerGracefully() {
   switchingSource = false;
   switchStartedAt = 0;
   clearActiveSource();
-  setUiPhase("idle", "Encerrando...");
+  // Garante som/estado de "parou" se o worker caiu ou foi reiniciado
+  setTransmitting(false, isQuitting ? "Encerrando..." : "Conectado");
+  setUiPhase(isQuitting ? "idle" : (uiPhase === "error" ? "error" : "idle"), isQuitting ? "Encerrando..." : "Reiniciando…");
   try {
     await withTimeout(leaveRoomInWorker(), 3000);
   } catch {}
@@ -1076,8 +1095,7 @@ ipcMain.on("share:state", (_e, state) => {
     switchingSource = true;
     if (!switchStartedAt) switchStartedAt = Date.now();
     setUiPhase("switching", "Alterando fonte...");
-    transmitting = true;
-    updateTrayIcon();
+    // Não mexe em transmitting aqui — evita som falso de start/stop na troca de fonte
     broadcastUiState();
     return;
   }
@@ -1092,21 +1110,58 @@ ipcMain.on("share:state", (_e, state) => {
     }
     return;
   }
-  switchingSource = false;
-  switchStartedAt = 0;
   if (active) {
+    switchingSource = false;
+    switchStartedAt = 0;
     setActiveSourceFromCfg(readCfg() || {});
     setTransmitting(true, audioOk === false ? "Transmitindo (sem áudio do app)" : "Transmitindo");
     setUiPhase("live", lastStatus || "Transmitindo");
   } else {
+    // Durante troca de fonte o track pode cair um instante — não é "parou de transmitir"
+    if (switchingSource) {
+      broadcastUiState();
+      return;
+    }
+    switchingSource = false;
+    switchStartedAt = 0;
     setTransmitting(false, lastStatus && !/^transmitindo/i.test(lastStatus) ? lastStatus : "Conectado");
     stopNativeAudioCapture();
     if (uiPhase !== "error" && uiPhase !== "connecting") setUiPhase("connected", lastStatus || "Conectado");
   }
 });
 
-ipcMain.on("gesture", async () => {
-  await runStartShare();
+ipcMain.on("gesture", () => {
+  // Compat: gesto antigo = pedido de transmissão (não inicia sozinho)
+  pendingPresent = { target: "", from: "", at: Date.now() };
+  showPanel();
+  playCue("present");
+  notify("Telador", "Pedido de transmissão — aceite ou recuse no painel");
+  broadcastUiState();
+});
+
+ipcMain.on("present:request", (_e, info) => {
+  const i = info && typeof info === "object" ? info : {};
+  pendingPresent = {
+    target: String(i.target || ""),
+    from: String(i.from || ""),
+    at: Date.now(),
+  };
+  showPanel();
+  playCue("present");
+  const who = pendingPresent.from ? ` de ${pendingPresent.from}` : "";
+  notify("Telador", `Pedido de transmissão${who} — aceite ou recuse no painel`);
+  broadcastUiState();
+});
+
+ipcMain.handle("present:respond", async (_e, accepted) => {
+  const had = pendingPresent;
+  pendingPresent = null;
+  broadcastUiState();
+  if (accepted && had) {
+    await runStartShare();
+    return { ok: true, started: true };
+  }
+  return { ok: true, started: false };
 });
 
 if (!app.requestSingleInstanceLock()) {

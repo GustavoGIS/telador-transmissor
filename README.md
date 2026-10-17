@@ -58,7 +58,7 @@ Codec preferido de vídeo: **H.264** (fallback VP8 nos hooks). Áudio stereo, bi
 
 Mensagens JSON usadas pelo app:
 
-- `{ "type": "present", "target": "<nome>" }` — se `target` for o broadcaster local, inicia/reativa share; senão, outro broadcaster pode forçar stop.
+- `{ "type": "present", "target": "<nome>" }` — se `target` for o broadcaster local, o painel mostra toast sticky (Aceitar/Recusar) e só inicia share se aceito; senão, outro broadcaster pode forçar stop.
 - `{ "type": "source-switch", "t": <timestamp> }` — publicado ao trocar de fonte (ajuda viewers a remountar).
 
 Metadata local pode incluir `teladorSwitch` ao trocar fonte.

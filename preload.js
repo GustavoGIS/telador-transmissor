@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld("telador", {
     ipcRenderer.on("ui:confirm-quit", handler);
     return () => { try { ipcRenderer.removeListener("ui:confirm-quit", handler); } catch {} };
   },
+  onSound: (cb) => {
+    const handler = (_e, name) => { try { cb(name); } catch {} };
+    ipcRenderer.on("ui:sound", handler);
+    return () => { try { ipcRenderer.removeListener("ui:sound", handler); } catch {} };
+  },
   log: (level, msg, extra) => ipcRenderer.send("log", { level, msg, extra }),
   setStatus: (s) => ipcRenderer.send("status", s),
   setShareState: (state) => ipcRenderer.send("share:state", state),
@@ -40,6 +45,8 @@ contextBridge.exposeInMainWorld("telador", {
   setAudioStatus: (ok) => ipcRenderer.send("audio:status", !!ok),
   setStats: (s) => ipcRenderer.send("stats:update", s || {}),
   gesture: () => ipcRenderer.send("gesture"),
+  requestPresent: (info) => ipcRenderer.send("present:request", info || {}),
+  respondPresent: (accepted) => ipcRenderer.invoke("present:respond", !!accepted),
   startNativeAudio: () => ipcRenderer.invoke("audio:start"),
   stopNativeAudio: () => ipcRenderer.invoke("audio:stop"),
   onNativePcm: (cb) => {

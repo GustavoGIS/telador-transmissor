@@ -1,6 +1,6 @@
 {
   "name": "telador-transmissor",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Transmissor de tela do Telador",
   "author": "Gustavo",
   "main": "main.js",

@@ -211,12 +211,23 @@
 
     <div class="toast" id="toast" hidden role="status" aria-live="polite">
       <svg class="ico" id="toastIco"><use href="#i-check"/></svg>
-      <span id="toastText"></span>
+      <div class="toast-body">
+        <span id="toastText"></span>
+        <div class="toast-actions" id="toastActions" hidden>
+          <button type="button" class="primary toast-btn" id="toastAccept">
+            <svg class="ico"><use href="#i-check"/></svg><span>Aceitar</span>
+          </button>
+          <button type="button" class="ghost toast-btn" id="toastDecline">
+            <svg class="ico"><use href="#i-x"/></svg><span>Recusar</span>
+          </button>
+        </div>
+      </div>
       <button type="button" class="toast-close" id="toastClose" title="Fechar" aria-label="Fechar">
         <svg class="ico"><use href="#i-x"/></svg>
       </button>
     </div>
 
+    <script src="./sounds.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
