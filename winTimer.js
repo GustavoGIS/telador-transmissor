@@ -1,13 +1,14 @@
 /**
- * Windows 11: mantém timer de alta resolução mesmo com janelas ocultas/minimizadas.
- * Mesma abordagem documentada pela Microsoft e usada pelo OBS
- * (SetProcessInformation + PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION).
+ * Windows: QoS / timer de alta resolução (API Microsoft, mesma linha do OBS).
+ * - IGNORE_TIMER_RESOLUTION off → timeBeginPeriod continua valendo com janela oculta (Win11)
+ * - EXECUTION_SPEED off → evita EcoQoS (CPU “econômica” em segundo plano)
  */
 "use strict";
 
 const ProcessPowerThrottling = 4;
 const PROCESS_POWER_THROTTLING_CURRENT_VERSION = 1;
 /** @see https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation */
+const PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
 const PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION = 0x4;
 
 let api = null;
@@ -36,15 +37,21 @@ function loadApi() {
   }
 }
 
-/** Desliga o throttling de timer do Win11 (StateMask=0 = sempre honrar timeBeginPeriod). */
-function optOutTimerThrottling() {
+/**
+ * Desliga throttling de timer + EcoQoS (StateMask=0 = mecanismos off / HighQoS).
+ * Seguro em Win10/11: em builds antigas a API pode falhar sem efeito colateral.
+ */
+function optOutPowerThrottling() {
   if (process.platform !== "win32" || optedOut) return !!optedOut;
   const a = loadApi();
   if (!a) return false;
   try {
+    const control =
+      PROCESS_POWER_THROTTLING_EXECUTION_SPEED |
+      PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
     const state = Buffer.alloc(12);
     state.writeUInt32LE(PROCESS_POWER_THROTTLING_CURRENT_VERSION, 0);
-    state.writeUInt32LE(PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION, 4);
+    state.writeUInt32LE(control, 4);
     state.writeUInt32LE(0, 8);
     const ok = a.SetProcessInformation(
       a.GetCurrentProcess(),
@@ -59,12 +66,17 @@ function optOutTimerThrottling() {
   }
 }
 
+/** @deprecated use optOutPowerThrottling */
+function optOutTimerThrottling() {
+  return optOutPowerThrottling();
+}
+
 function beginHighResPeriod() {
   if (process.platform !== "win32" || periodActive) return periodActive;
   const a = loadApi();
   if (!a) return false;
   try {
-    optOutTimerThrottling();
+    optOutPowerThrottling();
     const r = a.timeBeginPeriod(1);
     periodActive = r === 0;
     return periodActive;
@@ -98,6 +110,7 @@ function shutdown() {
 }
 
 module.exports = {
+  optOutPowerThrottling,
   optOutTimerThrottling,
   setStreamingTimers,
   shutdown,

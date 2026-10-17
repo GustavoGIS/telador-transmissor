@@ -5,6 +5,7 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const winPlatform = require("./winPlatform");
 
 // Antes de app.ready — captura/encode WebRTC (Chromium)
 // Default do desktop capturer: só 50% de 1 núcleo → costuma travar ~20–25 fps em 1080p
@@ -21,13 +22,10 @@ try {
     app.commandLine.appendSwitch("ignore-gpu-blocklist");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
     app.commandLine.appendSwitch("enable-zero-copy");
+    // WGC de tela só em Win11 24H2+ (build ≥ 26100); ver winPlatform.js
     app.commandLine.appendSwitch(
       "enable-features",
-      [
-        "PlatformH264CbpEncoding",
-        "MediaFoundationH264CbpEncoding",
-        "CanvasOopRasterization",
-      ].join(",")
+      winPlatform.chromiumEnableFeatures().join(",")
     );
   }
 } catch {}
@@ -1269,10 +1267,16 @@ if (!app.requestSingleInstanceLock()) {
     scrubElectronStartMenuPoison();
     baseIcon = loadAppIcon();
     try {
-      const timerOk = winTimer.optOutTimerThrottling();
-      log.info("win timer throttling opt-out", { ok: timerOk });
+      const caps = winPlatform.describe();
+      const powerOk = winTimer.optOutPowerThrottling();
+      log.info("win platform", {
+        build: caps.build,
+        isWin11: caps.isWin11,
+        wgcScreenCapturer: caps.wgcScreen ? "on" : "off",
+        powerThrottlingOptOut: powerOk ? "on" : "off",
+      });
     } catch (e) {
-      log.warn("win timer opt-out", e && e.message);
+      log.warn("win platform init", e && e.message);
     }
     log.info("app ready", { version: APP_VERSION, packaged: app.isPackaged });
     const allowPerm = new Set(["media", "display-capture", "mediaKeySystem", "fullscreen"]);
