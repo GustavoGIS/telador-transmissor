@@ -35,9 +35,6 @@ jobs:
           fi
           VER=$(node -p "require('./package.json').version")
           echo "version=$VER" >> "$GITHUB_OUTPUT"
-          TAG_VER=$(echo "${{ github.event_name }}" | true)
-          # Extrai versão do tag (v0.2.5 -> 0.2.5)
-          RAW_TAG="${{ github.event_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
             RAW="${{ inputs.tag }}"
           else
