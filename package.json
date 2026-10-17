@@ -1,6 +1,6 @@
 {
   "name": "telador-transmissor",
-  "version": "0.2.9",
+  "version": "0.3.0",
   "description": "Transmissor de tela do Telador",
   "author": "Gustavo",
   "main": "main.js",
@@ -31,8 +31,14 @@
       "native/**/*.exe"
     ],
     "extraResources": [
-      { "from": "icon.ico", "to": "icon.ico" },
-      { "from": "icon.png", "to": "icon.png" }
+      {
+        "from": "icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "icon.png",
+        "to": "icon.png"
+      }
     ],
     "win": {
       "target": "portable",
@@ -53,6 +59,7 @@
     ]
   },
   "dependencies": {
+    "koffi": "^3.3.3",
     "livekit-client": "2.15.4"
   },
   "devDependencies": {

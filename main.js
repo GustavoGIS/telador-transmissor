@@ -37,6 +37,7 @@ const log = require("./log");
 const updater = require("./updater");
 const quality = require("./quality");
 const configSchema = require("./configSchema");
+const winTimer = require("./winTimer");
 const { discoverLivekitUrl, SITE: DISCOVER_SITE } = require("./discoverLivekit");
 
 const SITE = DISCOVER_SITE || "https://telador.vercel.app";
@@ -349,6 +350,7 @@ function setTransmitting(on, statusText) {
     transmitting = next;
     updateTrayIcon();
     setPowerBlock(next);
+    try { winTimer.setStreamingTimers(next); } catch {}
     // Som só na borda real: começou / parou (qualquer motivo)
     if (next) playCue("tx-start");
     else playCue("tx-stop");
@@ -1266,6 +1268,12 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     scrubElectronStartMenuPoison();
     baseIcon = loadAppIcon();
+    try {
+      const timerOk = winTimer.optOutTimerThrottling();
+      log.info("win timer throttling opt-out", { ok: timerOk });
+    } catch (e) {
+      log.warn("win timer opt-out", e && e.message);
+    }
     log.info("app ready", { version: APP_VERSION, packaged: app.isPackaged });
     const allowPerm = new Set(["media", "display-capture", "mediaKeySystem", "fullscreen"]);
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => allowPerm.has(String(perm)));
@@ -1294,6 +1302,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on("will-quit", () => {
+    try { winTimer.shutdown(); } catch {}
     try { globalShortcut.unregisterAll(); } catch {}
   });
 
@@ -1304,6 +1313,7 @@ if (!app.requestSingleInstanceLock()) {
     withTimeout(destroyWorkerGracefully(), 4000)
       .catch(() => {})
       .finally(() => {
+        try { winTimer.shutdown(); } catch {}
         try { stopNativeAudioCapture(); } catch {}
         app.exit(0);
       });
