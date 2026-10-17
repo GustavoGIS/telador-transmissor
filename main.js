@@ -1,12 +1,22 @@
 const {
   app, BrowserWindow, Tray, Menu, session, desktopCapturer, ipcMain,
   nativeImage, shell, globalShortcut, Notification, clipboard, dialog,
+  powerSaveBlocker,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-// Antes de app.ready: pede encode H.264 por hardware (Media Foundation → NVENC na 4060)
+// Antes de app.ready — captura/encode WebRTC (Chromium)
+// Default do desktop capturer: só 50% de 1 núcleo → costuma travar ~20–25 fps em 1080p
 try {
+  app.commandLine.appendSwitch("webrtc-max-cpu-consumption-percentage", "100");
+  // Switch real do Chromium (= kWebRtcMaxCaptureFramerate); "webrtc-max-capture-framerate" é alias informal
+  app.commandLine.appendSwitch("max-gum-fps", "60");
+  app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+  // NVIDIA às vezes aplica "FPS de app em segundo plano" no portable empacotado
+  app.commandLine.appendSwitch("disable-gpu-vsync");
+  app.commandLine.appendSwitch("disable-frame-rate-limit");
+
   if (process.platform === "win32") {
     app.commandLine.appendSwitch("ignore-gpu-blocklist");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
@@ -139,6 +149,20 @@ let isQuitting = false;
 let liveStats = { bitrate: 0, loss: 0, rtt: 0, codec: "", health: "idle", fps: 0 };
 let boundsSaveTimer = null;
 let pendingPresent = null;
+let powerBlockerId = null;
+
+function setPowerBlock(on) {
+  try {
+    if (on) {
+      if (powerBlockerId == null || !powerSaveBlocker.isStarted(powerBlockerId)) {
+        powerBlockerId = powerSaveBlocker.start("prevent-app-suspension");
+      }
+    } else if (powerBlockerId != null && powerSaveBlocker.isStarted(powerBlockerId)) {
+      powerSaveBlocker.stop(powerBlockerId);
+      powerBlockerId = null;
+    }
+  } catch {}
+}
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -324,6 +348,7 @@ function setTransmitting(on, statusText) {
   if (next !== was) {
     transmitting = next;
     updateTrayIcon();
+    setPowerBlock(next);
     // Som só na borda real: começou / parou (qualquer motivo)
     if (next) playCue("tx-start");
     else playCue("tx-stop");
@@ -622,6 +647,7 @@ function startWorker() {
         },
       });
       applyWindowIcon(worker);
+      try { worker.webContents.setBackgroundThrottling(false); } catch {}
       worker.webContents.setAudioMuted(true);
       worker.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       worker.webContents.on("did-finish-load", () => {

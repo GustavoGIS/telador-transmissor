@@ -202,9 +202,10 @@
     const list = Array.isArray(presets) && presets.length
       ? presets
       : [
-          { id: "high", label: "Alta (1080p60)" },
-          { id: "balanced", label: "Equilibrada (720p)" },
-          { id: "economy", label: "Economia" },
+          { id: "ultra", label: "Muito alto (1080p60)" },
+          { id: "high", label: "Alto (1080p30)" },
+          { id: "balanced", label: "Equilibrado (720p30)" },
+          { id: "economy", label: "Economia (720p20)" },
           { id: "custom", label: "Personalizado" },
         ];
     qualityEl.innerHTML = "";

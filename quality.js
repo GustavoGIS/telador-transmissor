@@ -1,28 +1,36 @@
 /** Presets de qualidade compartilhados (main / painel via IPC). */
 const PRESETS = {
-  high: {
-    id: "high",
-    label: "Alta (1080p60)",
+  ultra: {
+    id: "ultra",
+    label: "Muito alto (1080p60)",
     width: 1920,
     height: 1080,
     frameRate: 60,
     maxBitrate: 14e6,
   },
+  high: {
+    id: "high",
+    label: "Alto (1080p30)",
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+    maxBitrate: 8e6,
+  },
   balanced: {
     id: "balanced",
-    label: "Equilibrada (720p)",
+    label: "Equilibrado (720p30)",
     width: 1280,
     height: 720,
     frameRate: 30,
-    maxBitrate: 5e6,
+    maxBitrate: 4e6,
   },
   economy: {
     id: "economy",
-    label: "Economia",
+    label: "Economia (720p20)",
     width: 1280,
     height: 720,
-    frameRate: 24,
-    maxBitrate: 2.5e6,
+    frameRate: 20,
+    maxBitrate: 2e6,
   },
   custom: {
     id: "custom",
@@ -48,7 +56,6 @@ function resolvePreset(id, custom) {
       width: Math.min(1920, Math.max(640, parseInt(custom.width, 10) || 1920)),
       height: Math.min(1080, Math.max(360, parseInt(custom.height, 10) || 1080)),
       frameRate: Math.min(60, Math.max(15, parseInt(custom.frameRate, 10) || 60)),
-      // 1080p60 com movimento precisa de folga; 20 Mb/s ainda é pouco vs 800 Mbps de link
       maxBitrate: Math.min(20e6, Math.max(1e6, parseInt(custom.maxBitrate, 10) || 14e6)),
     };
   }
