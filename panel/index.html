@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Telador</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- Sprite SVG (stroke icons, herdam currentColor) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+      <symbol id="i-plug" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 7V3M15 7V3M8 7h8v4a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5V7zM12 16v5"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M9 12l2 2 4-4"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.5 5.2A10.5 10.5 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-4.1 4.8M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.9-.8"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-2.6-6.3M21 4v5h-5"/></symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 18h16M6 14l2-8h8l2 8M9 10h6"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 4v12M7 11l5 5 5-5M5 20h14"/></symbol>
+      <symbol id="i-install" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3v10M8 9l4 4 4-4M5 17h14v4H5z"/></symbol>
+      <symbol id="i-export" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 16V4M8 8l4-4 4 4M5 20h14"/></symbol>
+      <symbol id="i-import" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 4v12M8 12l4 4 4-4M5 20h14"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6 16V6a2 2 0 0 1 2-2h10"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></symbol>
+      <symbol id="i-power" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 3v8M7.5 6.5a7 7 0 1 0 9 0"/></symbol>
+      <symbol id="i-broadcast" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 13.5V20"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 20h8M12 16v4"/></symbol>
+      <symbol id="i-app" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13" y="13" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M16.5 16.5L21 21"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5 19a7 7 0 0 1 14 0"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="14" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M11.5 11.5L20 3M16 4l3 3"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 7h10M18 7h2M12 17h8M4 17h4"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+      <symbol id="i-signal" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 18V14M9 18V10M14 18V7M19 18V4"/></symbol>
+      <symbol id="i-warn" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 4l9 16H3L12 4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 10v4M12 17h.01"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12l5 5L20 7"/></symbol>
+    </svg>
+
+    <div class="boot" id="boot" aria-hidden="true">
+      <div class="spinner"></div>
+      <p id="bootText">Carregando…</p>
+    </div>
+
+    <div class="modal" id="quitModal" aria-hidden="true">
+      <div class="modal-box">
+        <h3><svg class="ico"><use href="#i-power"/></svg> Encerrar aplicativo?</h3>
+        <p>Há uma transmissão ativa. Encerrar interrompe o compartilhamento para todos na sala.</p>
+        <div class="row">
+          <button class="danger" id="btnQuitConfirm" type="button"><svg class="ico"><use href="#i-power"/></svg><span>Encerrar</span></button>
+          <button class="ghost" id="btnQuitCancel" type="button"><svg class="ico"><use href="#i-x"/></svg><span>Cancelar</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="firstRunModal" aria-hidden="true">
+      <div class="modal-box">
+        <h3><svg class="ico"><use href="#i-broadcast"/></svg> Bem-vindo ao Telador</h3>
+        <p>
+          Ao fechar esta janela o app continua na área de notificação.
+          Atalhos: <strong>Ctrl+Shift+T</strong> painel · <strong>S</strong> parar · <strong>R</strong> última fonte.
+          Clique duplo na bandeja transmite a última fonte.
+        </p>
+        <div class="row">
+          <button class="primary" id="btnFirstRunOk" type="button"><svg class="ico"><use href="#i-check"/></svg><span>Entendi</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="app">
+      <header>
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-mark" src="../icon.png" alt="" width="40" height="40" />
+            <h1 class="brand">Telador</h1>
+          </div>
+          <p class="subtitle">Painel do transmissor</p>
+        </div>
+        <div class="header-status">
+          <div class="health" title="Saúde da rede">
+            <svg class="ico ico-soft"><use href="#i-signal"/></svg>
+            <span class="hdot" id="hdot"></span>
+            <strong id="healthText">Rede —</strong>
+          </div>
+          <div class="pill" title="Status">
+            <span class="dot" id="dot"></span>
+            <strong id="statusText">Aguardando</strong>
+          </div>
+          <div class="stats" id="statsText"></div>
+        </div>
+      </header>
+
+      <div class="main">
+        <div class="col">
+          <section class="panel panel-access">
+            <h2 class="section-title"><svg class="ico"><use href="#i-lock"/></svg> Acesso</h2>
+            <div class="field">
+              <label for="name"><svg class="ico ico-sm"><use href="#i-user"/></svg> Nome de exibição</label>
+              <input id="name" type="text" placeholder="como você aparece na sala" spellcheck="false" />
+            </div>
+            <div class="field">
+              <label for="key"><svg class="ico ico-sm"><use href="#i-key"/></svg> Código da sala</label>
+              <div class="key-wrap">
+                <input id="key" type="password" placeholder="identificador da sala" autocomplete="off" />
+                <button class="ghost icon-only" id="btnCopyKey" type="button" title="Copiar" aria-label="Copiar">
+                  <svg class="ico"><use href="#i-copy"/></svg>
+                </button>
+                <button class="ghost icon-only" id="btnToggleKey" type="button" title="Mostrar" aria-label="Mostrar">
+                  <svg class="ico" id="icoToggleKey"><use href="#i-eye"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="quality"><svg class="ico ico-sm"><use href="#i-sliders"/></svg> Qualidade</label>
+              <select id="quality"></select>
+              <div class="custom-grid" id="customBox" hidden>
+                <div class="custom-field">
+                  <label for="cqW">Largura (px)</label>
+                  <input id="cqW" type="number" min="640" max="1920" step="160" placeholder="1280" />
+                </div>
+                <div class="custom-field">
+                  <label for="cqH">Altura (px)</label>
+                  <input id="cqH" type="number" min="360" max="1080" step="90" placeholder="720" />
+                </div>
+                <div class="custom-field">
+                  <label for="cqFps">Taxa (FPS)</label>
+                  <input id="cqFps" type="number" min="15" max="60" step="1" placeholder="30" />
+                </div>
+                <div class="custom-field">
+                  <label for="cqBr">Bitrate (Mbit/s)</label>
+                  <input id="cqBr" type="number" min="1" max="12" step="0.5" placeholder="4" />
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <button class="primary" id="btnConnect" type="button">
+                <span class="spinner" id="spinConnect" hidden></span>
+                <svg class="ico" id="icoConnect"><use href="#i-plug"/></svg>
+                <span id="labelConnect">Conectar</span>
+              </button>
+              <button class="ghost" id="btnPreflight" type="button">
+                <svg class="ico"><use href="#i-shield"/></svg><span>Verificar</span>
+              </button>
+              <button class="ghost" id="btnCancelConnect" type="button" hidden>
+                <svg class="ico"><use href="#i-x"/></svg><span>Cancelar</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="panel is-fill">
+            <h2 class="section-title"><svg class="ico"><use href="#i-sliders"/></svg> Opções</h2>
+            <div class="opts">
+              <button class="linkish" id="btnRestart" type="button"><svg class="ico"><use href="#i-refresh"/></svg><span>Reiniciar conexão</span></button>
+              <button class="linkish" id="btnTestAudio" type="button"><svg class="ico"><use href="#i-mic"/></svg><span>Testar áudio</span></button>
+              <button class="linkish" id="btnCheckUpdate" type="button"><svg class="ico"><use href="#i-download"/></svg><span id="lblCheckUpdate">Verificar atualizações</span></button>
+              <button class="linkish" id="btnDiag" type="button"><svg class="ico"><use href="#i-copy"/></svg><span>Copiar diagnóstico</span></button>
+              <button class="linkish" id="btnLogs" type="button"><svg class="ico"><use href="#i-folder"/></svg><span>Abrir pasta de logs</span></button>
+              <button class="linkish" id="btnQuit" type="button"><svg class="ico"><use href="#i-power"/></svg><span>Encerrar aplicativo</span></button>
+            </div>
+            <div class="progress" id="updProgress"><i id="updBar"></i></div>
+          </section>
+        </div>
+
+        <div class="col">
+          <section class="panel is-fill">
+            <h2 class="section-title"><svg class="ico"><use href="#i-broadcast"/></svg> Transmissão</h2>
+            <div class="warn-banner" id="audioWarn">
+              <svg class="ico"><use href="#i-warn"/></svg>
+              <span>Áudio do aplicativo indisponível — a sala pode ouvir só o vídeo.</span>
+            </div>
+            <p class="source-line">
+              <svg class="ico ico-sm"><use href="#i-monitor"/></svg>
+              Fonte selecionada: <b id="sourceLabel">Nenhuma</b>
+            </p>
+            <div class="tabs">
+              <button class="tab is-on" id="tabScreen" type="button"><svg class="ico"><use href="#i-monitor"/></svg><span>Telas</span></button>
+              <button class="tab" id="tabWindow" type="button"><svg class="ico"><use href="#i-app"/></svg><span>Aplicativos</span></button>
+            </div>
+            <div class="filter-row filter-with-ico">
+              <svg class="ico ico-soft"><use href="#i-search"/></svg>
+              <input id="filter" type="search" placeholder="Filtrar…" />
+            </div>
+            <div class="list" id="sourceList" tabindex="0"></div>
+            <div class="row tx-actions">
+              <button class="primary" id="btnTransmit" type="button">
+                <span class="spinner" id="spinTx" hidden></span>
+                <svg class="ico" id="icoTx"><use href="#i-broadcast"/></svg>
+                <span id="labelTx">Transmitir</span>
+              </button>
+              <button class="danger" id="btnStop" type="button" disabled>
+                <svg class="ico"><use href="#i-stop"/></svg><span>Parar</span>
+              </button>
+              <button class="ghost" id="btnRefresh" type="button">
+                <svg class="ico"><use href="#i-refresh"/></svg><span>Atualizar lista</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer>
+        <div class="foot-note">Fechar a janela mantém o app na bandeja. Duplo clique na bandeja = última fonte.</div>
+        <div class="ver" id="ver">—</div>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" hidden role="status" aria-live="polite">
+      <svg class="ico" id="toastIco"><use href="#i-check"/></svg>
+      <span id="toastText"></span>
+      <button type="button" class="toast-close" id="toastClose" title="Fechar" aria-label="Fechar">
+        <svg class="ico"><use href="#i-x"/></svg>
+      </button>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

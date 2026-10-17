@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.asar-extract/
+*.log
+logs/
+_*.js
+.DS_Store
+Thumbs.db
+*.pfx
+*.p12
+.cursor/
+*.tmp

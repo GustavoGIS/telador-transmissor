@@ -1,0 +1,59 @@
+{
+  "name": "telador-transmissor",
+  "version": "0.2.5",
+  "description": "Transmissor de tela do Telador",
+  "author": "Gustavo",
+  "main": "main.js",
+  "scripts": {
+    "vendor:livekit": "node scripts/vendor-livekit.js",
+    "icon": "node scripts/make-icon.js",
+    "postinstall": "node scripts/vendor-livekit.js && node scripts/make-icon.js",
+    "start": "electron .",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-native.ps1",
+    "build": "npm run icon && npm run vendor:livekit && npm run build:native && electron-builder",
+    "release:local": "npm run build"
+  },
+  "build": {
+    "appId": "com.telador.transmissor",
+    "productName": "Telador Transmissor",
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!**/*.md",
+      "!_*.js",
+      "!.asar-extract/**",
+      "!.git/**",
+      "!.github/**",
+      "!logs/**",
+      "!*.log"
+    ],
+    "asarUnpack": [
+      "native/**/*.exe"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "icon.ico",
+      "signtoolOptions": {
+        "publisherName": "Telador"
+      }
+    },
+    "icon": "icon.ico",
+    "artifactName": "Telador-Transmissor-${version}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "GustavoGIS",
+        "repo": "telador",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "livekit-client": "2.15.4"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.2"
+  }
+}

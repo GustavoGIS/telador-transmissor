@@ -1,0 +1,67 @@
+name: Release Transmissor
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.2.3)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm install
+
+      - name: Build native + portable
+        env:
+          # Opcional: secrets CSC_LINK (base64/.pfx) + CSC_KEY_PASSWORD para assinar
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: npm run build
+
+      - name: Resolve tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          VER=$(node -p "require('./package.json').version")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_REPO: ${{ vars.RELEASE_REPO }}
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          VER="${{ steps.meta.outputs.version }}"
+          REPO="${RELEASE_REPO:-${{ github.repository }}}"
+          EXE="dist/Telador-Transmissor-${VER}.exe"
+          if [ ! -f "$EXE" ]; then
+            EXE=$(ls dist/Telador-Transmissor-*.exe | head -n1)
+          fi
+          test -f "$EXE"
+          gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || \
+            gh release create "$TAG" -R "$REPO" \
+              --title "Telador Transmissor v${VER}" \
+              --notes "Portable Windows build ${TAG}."
+          gh release upload "$TAG" "$EXE" -R "$REPO" --clobber
