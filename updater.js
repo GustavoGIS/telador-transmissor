@@ -102,10 +102,6 @@ function normalizeDigest(d) {
   return m ? m[1] : "";
 }
 
-function cmdQuote(p) {
-  return `"${String(p).replace(/"/g, "")}"`;
-}
-
 function updatesDir() {
   return path.join(app.getPath("userData"), "updates");
 }
@@ -213,6 +209,7 @@ function cleanupOldArtifacts(keepPaths) {
 /**
  * Substitui o .exe portable no caminho em que está, verifica o arquivo,
  * limpa restos e relança o mesmo caminho.
+ * Usa PowerShell oculto (sem janela preta com "find").
  */
 function applyDownloaded(exePath) {
   const downloaded = path.resolve(exePath);
@@ -229,9 +226,8 @@ function applyDownloaded(exePath) {
   });
 
   if (!replacePath) {
-    // Sem caminho estável: abre o baixado (dev / caso raro)
     cleanupOldArtifacts([downloaded]);
-    spawn(downloaded, [], { detached: true, stdio: "ignore" }).unref();
+    spawn(downloaded, [], { detached: true, stdio: "ignore", windowsHide: true }).unref();
     setTimeout(() => {
       try { app.exit(0); } catch {}
     }, 400);
@@ -240,76 +236,107 @@ function applyDownloaded(exePath) {
 
   const pid = process.pid;
   const tmp = app.getPath("temp");
-  const scriptPath = path.join(tmp, `telador-update-${pid}-${Date.now()}.cmd`);
+  const ps1Path = path.join(tmp, `telador-update-${pid}-${Date.now()}.ps1`);
   const verifyPath = path.join(tmp, `telador-update-verify-${pid}.txt`);
   const expectedSize = (() => {
     try { return fs.statSync(downloaded).size; } catch { return 0; }
   })();
-
-  // Após sair: mata bandeja antiga → copia por cima do portable → confere tamanho →
-  // apaga updates antigos e outros Telador-Transmissor-*.exe na pasta (exceto o ativo)
   const replaceDir = path.dirname(replacePath);
   const keepName = path.basename(replacePath);
-  const lines = [
-    "@echo off",
-    "setlocal EnableExtensions",
-    ":wait",
-    `tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul`,
-    "if not errorlevel 1 (",
-    "  timeout /t 1 /nobreak >nul",
-    "  goto wait",
-    ")",
-    "timeout /t 1 /nobreak >nul",
-    'taskkill /IM "Telador Transmissor.exe" /F >nul 2>&1',
-    'taskkill /IM "Telador-Transmissor.exe" /F >nul 2>&1',
-    "timeout /t 1 /nobreak >nul",
-    `copy /Y ${cmdQuote(downloaded)} ${cmdQuote(replacePath)}`,
-    "if errorlevel 1 (",
-    `  echo COPY_FAIL>${cmdQuote(verifyPath)}`,
-    `  start "" ${cmdQuote(downloaded)}`,
-    "  goto cleanup",
-    ")",
-  ];
+  const updates = updatesDir();
+  const legacyDir = path.join(process.env.LOCALAPPDATA || "", "TeladorTransmissor");
 
-  if (expectedSize > 0) {
-    // Verifica se o arquivo final tem o mesmo tamanho do download
-    lines.push(
-      `for %%A in (${cmdQuote(replacePath)}) do set SZ=%%~zA`,
-      `if not "%SZ%"=="${expectedSize}" (`,
-      `  echo SIZE_FAIL %SZ%>>${cmdQuote(verifyPath)}`,
-      `  start "" ${cmdQuote(downloaded)}`,
-      "  goto cleanup",
-      ")",
-    );
+  const ps = `
+$ErrorActionPreference = 'Continue'
+$pidWait = ${pid}
+$downloaded = ${JSON.stringify(downloaded)}
+$replacePath = ${JSON.stringify(replacePath)}
+$replaceDir = ${JSON.stringify(replaceDir)}
+$keepName = ${JSON.stringify(keepName)}
+$updatesDir = ${JSON.stringify(updates)}
+$legacyDir = ${JSON.stringify(legacyDir)}
+$verifyPath = ${JSON.stringify(verifyPath)}
+$expectedSize = ${expectedSize}
+$self = $MyInvocation.MyCommand.Path
+
+# Espera o app atual encerrar (sem tasklist/find na tela)
+$deadline = (Get-Date).AddSeconds(90)
+while ((Get-Date) -lt $deadline) {
+  $alive = Get-Process -Id $pidWait -ErrorAction SilentlyContinue
+  if (-not $alive) { break }
+  Start-Sleep -Milliseconds 400
+}
+Start-Sleep -Seconds 1
+
+# Mata restos na bandeja
+Get-Process -ErrorAction SilentlyContinue |
+  Where-Object { $_.ProcessName -match '^(Telador Transmissor|Telador-Transmissor)$' } |
+  Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 800
+
+function Start-Fallback {
+  try { Start-Process -FilePath $downloaded } catch {}
+}
+
+try {
+  Copy-Item -LiteralPath $downloaded -Destination $replacePath -Force
+} catch {
+  Set-Content -LiteralPath $verifyPath -Value 'COPY_FAIL' -Encoding ascii
+  Start-Fallback
+  if (Test-Path -LiteralPath $self) { Remove-Item -LiteralPath $self -Force -ErrorAction SilentlyContinue }
+  exit 1
+}
+
+if ($expectedSize -gt 0) {
+  $sz = (Get-Item -LiteralPath $replacePath).Length
+  if ($sz -ne $expectedSize) {
+    Set-Content -LiteralPath $verifyPath -Value ("SIZE_FAIL " + $sz) -Encoding ascii
+    Start-Fallback
+    if (Test-Path -LiteralPath $self) { Remove-Item -LiteralPath $self -Force -ErrorAction SilentlyContinue }
+    exit 1
   }
+}
 
-  lines.push(
-    `echo OK>${cmdQuote(verifyPath)}`,
-    // Staging userData\\updates
-    `if exist ${cmdQuote(updatesDir())} for %%F in (${cmdQuote(path.join(updatesDir(), "Telador-Transmissor-*.exe"))}) do del /F /Q "%%~fF" 2>nul`,
-    // Pasta do portable: outros Telador-Transmissor-*.exe (mantém o que acabou de substituir)
-    `for %%F in (${cmdQuote(path.join(replaceDir, "Telador-Transmissor-*.exe"))}) do (`,
-    `  if /I not "%%~nxF"=="${keepName}" del /F /Q "%%~fF" 2>nul`,
-    ")",
-    // Pasta legada de builds intermediárias
-    `if exist ${cmdQuote(path.join(process.env.LOCALAPPDATA || "", "TeladorTransmissor"))} (`,
-    `  for %%F in (${cmdQuote(path.join(process.env.LOCALAPPDATA || "", "TeladorTransmissor", "Telador-Transmissor*.exe"))}) do del /F /Q "%%~fF" 2>nul`,
-    ")",
-    `start "" ${cmdQuote(replacePath)}`,
-    ":cleanup",
-    'del /F /Q "%~f0" 2>nul',
-  );
+Set-Content -LiteralPath $verifyPath -Value 'OK' -Encoding ascii
 
-  fs.writeFileSync(scriptPath, lines.join("\r\n"), "utf8");
-  spawn("cmd.exe", ["/c", scriptPath], {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true,
-  }).unref();
+# Limpa staging e outros portables antigos na mesma pasta
+if (Test-Path -LiteralPath $updatesDir) {
+  Get-ChildItem -LiteralPath $updatesDir -Filter 'Telador-Transmissor-*.exe' -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+}
+Get-ChildItem -LiteralPath $replaceDir -Filter 'Telador-Transmissor-*.exe' -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -ine $keepName } |
+  Remove-Item -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $legacyDir) {
+  Get-ChildItem -LiteralPath $legacyDir -Filter 'Telador-Transmissor*.exe' -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
+try { Start-Process -FilePath $replacePath } catch { Start-Fallback }
+if (Test-Path -LiteralPath $self) { Remove-Item -LiteralPath $self -Force -ErrorAction SilentlyContinue }
+`.trim();
+
+  fs.writeFileSync(ps1Path, ps, "utf8");
+
+  // -WindowStyle Hidden evita a janela preta; windowsHide reforça no spawn
+  spawn(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-ExecutionPolicy", "Bypass",
+      "-WindowStyle", "Hidden",
+      "-File", ps1Path,
+    ],
+    {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    }
+  ).unref();
 
   setTimeout(() => {
     try { app.exit(0); } catch {}
-  }, 400);
+  }, 500);
   return true;
 }
 
