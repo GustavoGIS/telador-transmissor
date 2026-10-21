@@ -46,14 +46,17 @@ function getVideoPub() {
 }
 
 async function getLivekitUrl() {
-  if (cfg && cfg.livekitUrl) return cfg.livekitUrl;
+  // Sempre pergunta ao main (rediscovery do site) — não usar cfg.livekitUrl antigo
   try {
     if (T && typeof T.getLivekitUrl === "function") {
       const u = await T.getLivekitUrl();
       if (u) return u;
     }
   } catch (e) {}
-  return "wss://telador-fprg5who.livekit.cloud";
+  if (cfg && cfg.livekitUrl && !/telador-fprg5who/i.test(cfg.livekitUrl)) {
+    return cfg.livekitUrl;
+  }
+  return "wss://telador2-r17fz9fd.livekit.cloud";
 }
 
 function waitForHooks(ms) {

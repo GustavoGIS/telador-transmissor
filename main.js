@@ -35,7 +35,12 @@ const updater = require("./updater");
 const quality = require("./quality");
 const configSchema = require("./configSchema");
 const winTimer = require("./winTimer");
-const { discoverLivekitUrl, SITE: DISCOVER_SITE } = require("./discoverLivekit");
+const {
+  discoverLivekitUrl,
+  clearDiscoverCache,
+  isStaleUrl,
+  SITE: DISCOVER_SITE,
+} = require("./discoverLivekit");
 
 const SITE = DISCOVER_SITE || "https://telador.vercel.app";
 const APP_VERSION = (() => {
@@ -693,8 +698,14 @@ async function loadWorkerEntry(win) {
   if (!win || win.isDestroyed()) return;
   try {
     const cfg = readCfg() || {};
-    const url = await discoverLivekitUrl(cfg.livekitUrl);
-    if (url && url !== cfg.livekitUrl) writeCfg({ livekitUrl: url });
+    if (cfg.livekitUrl && isStaleUrl(cfg.livekitUrl)) {
+      log.warn("clearing stale livekitUrl", cfg.livekitUrl);
+      clearDiscoverCache();
+      writeCfg({ livekitUrl: "" });
+    }
+    clearDiscoverCache();
+    const url = await discoverLivekitUrl("");
+    if (url) writeCfg({ livekitUrl: url });
   } catch (e) {
     log.warn("livekit discover", e && e.message);
   }
